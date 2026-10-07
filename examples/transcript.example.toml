@@ -44,8 +44,11 @@ note = "Lossless recording."
 # People. Samples are stretches where only that person speaks (seconds into the source,
 # "MM:SS" or "H:MM:SS"), ideally their own introduction. 10-30 s each is enough; more is better.
 # A person without samples is enrolled from turns where the listening model is sure of them.
+# `description` tells the listening models how to recognise the person; `role` (optional, short)
+# is what the transcript shows.
 [[people]]
 name = "Ana"
+role = "Ana Example, facilitator"
 description = "Facilitator. Female, loud, closest to the microphone, the main speaker."
 samples = [{ source = "am", start = "01:05", end = "01:35" }]
 

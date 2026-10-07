@@ -52,9 +52,12 @@ class Sample:
 
 @dataclass(frozen=True)
 class Person:
+    """`description` is for the listening models; `role` (short) is shown in the transcript."""
+
     name: str
     description: str
     samples: tuple[Sample, ...] = ()
+    role: str = ""
 
 
 @dataclass(frozen=True)
@@ -125,7 +128,8 @@ def _person(raw: dict[str, Any], keys: set[str]) -> Person:
     for sample in samples:
         if sample.source not in keys or sample.end <= sample.start:
             raise ValueError(f"{raw['name']}: bad sample {sample}")
-    return Person(name=raw["name"], description=raw["description"], samples=samples)
+    return Person(name=raw["name"], description=raw["description"], samples=samples,
+                  role=raw.get("role", ""))
 
 
 def _voices(raw: dict[str, Any]) -> Voices:

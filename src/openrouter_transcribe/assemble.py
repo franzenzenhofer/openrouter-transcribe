@@ -52,20 +52,33 @@ def records(project: Project, chunk: Chunk) -> list[dict[str, Any]]:
 
 
 def speakers_section(project: Project, rows: list[dict[str, Any]]) -> list[str]:
-    words = Counter[str]()
+    words: Counter[str] = Counter()
+    seconds: dict[str, float] = {}
     for row in rows:
         words[row["speaker"]] += row["words"]
+        spoken_for = datetime.fromisoformat(row["end"]) - datetime.fromisoformat(row["start"])
+        seconds[row["speaker"]] = seconds.get(row["speaker"], 0.0) + spoken_for.total_seconds()
     total = max(1, sum(words.values()))
-    lines = ["## Speakers", ""]
-    for person in project.people:
-        if words[person.name]:
-            lines.append(f"- **{person.name}** ({words[person.name] / total:.0%} of words): "
-                         f"{person.description}")
-    lines += [f"- **{label}** ({words[label] / total:.0%} of words): {meaning}"
-              for label, meaning in ((project.unclear, "a voice that could not be attributed."),
-                                     (project.several, "several people at once."))
-              if words[label]]
+    meanings = [(person.name, person.role or person.description) for person in project.people]
+    meanings += [(project.unclear, "a voice that could not be attributed."),
+                 (project.several, "several people at once.")]
+    lines = ["## Speakers", "", "| Speaker | Share of words | Minutes | Who |", "|---|---|---|---|"]
+    for name, meaning in meanings:
+        if words[name]:
+            minutes = seconds.get(name, 0.0) / 60
+            lines.append(f"| **{name}** | {words[name] / total:.0%} | {minutes:.0f} | {meaning} |")
     return [*lines, ""]
+
+
+def merged(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Consecutive turns of one speaker as one paragraph (for reading; the JSONL keeps all)."""
+    paragraphs: list[dict[str, Any]] = []
+    for row in rows:
+        if paragraphs and paragraphs[-1]["speaker"] == row["speaker"]:
+            paragraphs[-1] = {**paragraphs[-1], "text": f"{paragraphs[-1]['text']} {row['text']}"}
+        else:
+            paragraphs.append(row)
+    return paragraphs
 
 
 def method_section(project: Project, chunks: list[Chunk]) -> list[str]:
@@ -98,7 +111,7 @@ def run(project: Project) -> None:
         lines += [f"*{source.note}*", ""] if source.note else []
         for chunk in (chunk for chunk in chunks if chunk.source == source.key):
             lines += [f"### {chunk.wall_start[11:16]} - {chunk.wall_end[11:16]}", ""]
-            for row in by_chunk[chunk.index]:
+            for row in merged(by_chunk[chunk.index]):
                 lines += [f"**{row['speaker']}** [{row['start'][11:19]}]: {row['text']}", ""]
     markdown = project.root / f"{project.output}.md"
     markdown.write_text("\n".join(lines))
