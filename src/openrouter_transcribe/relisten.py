@@ -18,7 +18,7 @@ from openrouter_transcribe.store import ledger_path, load_chunks, read_json, sta
 
 RADIUS_SECONDS = 15.0
 CONTEXT_SECONDS = 45.0
-MAX_OUTPUT_TOKENS = 8000
+MAX_OUTPUT_TOKENS = 20000
 
 RELISTEN_PROMPT = """\
 You hear a short CLIP from a long recording. Setting:
