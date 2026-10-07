@@ -34,6 +34,9 @@ def build_parser() -> argparse.ArgumentParser:
     passage = commands.add_parser("passage", help="how every listener heard a phrase")
     passage.add_argument("chunk", type=int)
     passage.add_argument("phrase")
+    relisten = commands.add_parser("relisten", help="a strong model hears 30 s around a moment")
+    relisten.add_argument("chunk", type=int)
+    relisten.add_argument("moment", help="MM:SS in the chunk")
     commands.add_parser("status", help="review status of every chunk")
     commands.add_parser("cost", help="billed so far, per model")
     return parser
@@ -55,6 +58,9 @@ def main() -> None:
         run_stage(command, project)
     elif command in ("approve", "passage", "status"):
         run_review_command(command, project, arguments)
+    elif command == "relisten":
+        importlib.import_module("openrouter_transcribe.relisten").print_relisten(
+            project, arguments.chunk, arguments.moment)
     elif command == "cost":
         costs = ledger_cost(ledger_path(project))
         for model, cost in sorted(costs.items()):

@@ -22,6 +22,16 @@ openrouter-transcribe passage NNN "two or three words"
 
 It prints the passage as heard by `final`, `second`, `whisper` and `stt`.
 
+When no listener settles a passage (every source differs, or only the auditor has it), let a
+strong model hear the original audio around that moment (about 0.02 USD per call):
+
+```bash
+openrouter-transcribe relisten NNN MM:SS
+```
+
+Apply what it hears when it is clear and fits at least one draft or the context; say
+"relisten" in the sign-off note. Its MM:SS times can be off; place text by the words around it.
+
 ## What to check, in this order
 
 1. **`review.audit.findings`** (the auditor heard the audio):
@@ -51,7 +61,7 @@ It prints the passage as heard by `final`, `second`, `whisper` and `stt`.
 * Rephrase, shorten, summarize, translate or tidy spoken language. It is verbatim.
 * Rename a speaker to a name outside the roster. Change `start` of existing turns.
 * Touch files outside `work/final/`, delete files, or run any stage other than `passage`,
-  `approve` and `status`.
+  `relisten`, `approve` and `status`.
 
 ## Sign-off
 

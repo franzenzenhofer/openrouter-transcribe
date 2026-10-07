@@ -63,7 +63,8 @@ trash first only if nothing was reviewed yet).
 
 Dispatch review subagents (about 8 chunks each, in parallel) with `skill/REVIEW-BRIEF.md` as
 their brief, the project file path and their chunk numbers. Tell each: run commands in the
-foreground, never end the turn waiting on background work. Then spot-check: read three
+foreground, never end the turn waiting on background work. Collect every passage the reviewers
+could not settle and run `$OT relisten N MM:SS` on each; apply the clear ones. Then spot-check: read three
 reviewed chunks yourself, and `$OT status` must show 0 pending.
 
 ## 6. Assemble and verify
