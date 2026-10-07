@@ -36,7 +36,7 @@ Client data (names, setting, glossary, times) lives only there, never in the too
 
 One capped OpenRouter key per project (management key creates it: `POST /api/v1/keys` with
 `{"name": "<project>-transcript", "limit": 30}`), stored outside the repo, chmod 600.
-About 1.45 USD per recorded hour (8.4 h cost 12.05 USD; half of it is the Pro second listener).
+About 1.45 USD per recorded hour for stages 1-7 (8.4 h cost 12.05 USD; half of it is the Pro second listener), plus about 0.06 USD per `relisten` (98 calls added 5.87 USD).
 
 ## 3. Run
 

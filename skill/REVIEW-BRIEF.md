@@ -23,7 +23,7 @@ openrouter-transcribe passage NNN "two or three words"
 It prints the passage as heard by `final`, `second`, `whisper` and `stt`.
 
 When no listener settles a passage (every source differs, or only the auditor has it), let a
-strong model hear the original audio around that moment (about 0.02 USD per call):
+strong model hear the original audio around that moment (about 0.06 USD per call):
 
 ```bash
 openrouter-transcribe relisten NNN MM:SS
