@@ -5,7 +5,6 @@ Refuses while any chunk is unreviewed or a turn carries a label outside the rost
 
 import json
 import re
-from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -51,22 +50,32 @@ def records(project: Project, chunk: Chunk) -> list[dict[str, Any]]:
     return rows
 
 
-def speakers_section(project: Project, rows: list[dict[str, Any]]) -> list[str]:
-    words: Counter[str] = Counter()
-    seconds: dict[str, float] = {}
+def speaker_stats(rows: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+    """Words, turns and speaking minutes per label, in order of first appearance."""
+    stats: dict[str, dict[str, float]] = {}
     for row in rows:
-        words[row["speaker"]] += row["words"]
+        entry = stats.setdefault(row["speaker"], {"words": 0, "turns": 0, "minutes": 0.0})
         spoken_for = datetime.fromisoformat(row["end"]) - datetime.fromisoformat(row["start"])
-        seconds[row["speaker"]] = seconds.get(row["speaker"], 0.0) + spoken_for.total_seconds()
-    total = max(1, sum(words.values()))
+        entry["words"] += row["words"]
+        entry["turns"] += 1
+        entry["minutes"] += spoken_for.total_seconds() / 60
+    return stats
+
+
+def speaker_meanings(project: Project) -> list[tuple[str, str]]:
     meanings = [(person.name, person.role or person.description) for person in project.people]
-    meanings += [(project.unclear, "a voice that could not be attributed."),
-                 (project.several, "several people at once.")]
+    return [*meanings, (project.unclear, "a voice that could not be attributed."),
+            (project.several, "several people at once.")]
+
+
+def speakers_section(project: Project, rows: list[dict[str, Any]]) -> list[str]:
+    stats = speaker_stats(rows)
+    total = max(1.0, sum(entry["words"] for entry in stats.values()))
     lines = ["## Speakers", "", "| Speaker | Share of words | Minutes | Who |", "|---|---|---|---|"]
-    for name, meaning in meanings:
-        if words[name]:
-            minutes = seconds.get(name, 0.0) / 60
-            lines.append(f"| **{name}** | {words[name] / total:.0%} | {minutes:.0f} | {meaning} |")
+    for name, meaning in speaker_meanings(project):
+        if name in stats:
+            share, minutes = stats[name]["words"] / total, stats[name]["minutes"]
+            lines.append(f"| **{name}** | {share:.0%} | {minutes:.0f} | {meaning} |")
     return [*lines, ""]
 
 
@@ -117,5 +126,29 @@ def run(project: Project) -> None:
     markdown.write_text("\n".join(lines))
     (project.root / f"{project.output}.jsonl").write_text(
         "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows))
-    print(f"wrote {markdown.name} and {project.output}.jsonl: {len(rows)} turns, "
+    document = transcript_document(project, chunks, rows)
+    (project.root / f"{project.output}.json").write_text(
+        json.dumps(document, ensure_ascii=False, indent=1))
+    print(f"wrote {project.output}.md, .json and .jsonl: {len(rows)} turns, "
           f"{sum(row['words'] for row in rows)} words", flush=True)
+
+
+def transcript_document(project: Project, chunks: list[Chunk],
+                        rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """The whole transcript as one JSON document: metadata, speakers with stats, all turns."""
+    stats = speaker_stats(rows)
+    total = max(1.0, sum(entry["words"] for entry in stats.values()))
+    return {
+        "title": project.title, "language": project.language,
+        "hours": round(sum(chunk.seconds for chunk in chunks) / 3600, 2),
+        "sessions": [{"key": source.key, "title": source.title,
+                      "start": source.wall_start.isoformat(), "end": source.wall_end.isoformat(),
+                      "note": source.note} for source in project.sources],
+        "models": project.models, "voice_models": list(project.voices.models),
+        "speakers": [{"name": name, "who": meaning, "words": int(stats[name]["words"]),
+                      "share_of_words": round(stats[name]["words"] / total, 4),
+                      "turns": int(stats[name]["turns"]),
+                      "minutes": round(stats[name]["minutes"], 1)}
+                     for name, meaning in speaker_meanings(project) if name in stats],
+        "turns": [{"id": index + 1, **row} for index, row in enumerate(rows)],
+    }

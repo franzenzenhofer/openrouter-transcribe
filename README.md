@@ -40,7 +40,7 @@ $OT status           # what is left to review
 $OT passage 12 "two or three words"          # how every listener heard a passage
 $OT relisten 12 03:10                          # a strong model hears 30 s around a moment
 $OT approve 12 --note "inserted the answer at 03:10 (audit); Ben -> Ana at 05:02"
-$OT assemble         # <output>.md + <output>.jsonl
+$OT assemble         # <output>.md + <output>.json + <output>.jsonl
 $OT cost
 ```
 
@@ -57,7 +57,7 @@ $OT cost
 | 7 | `audit` | a model hears each chunk against its review file: omissions, wrong speakers | `final/` (review.audit) |
 | 8 | review | a person or an agent works through each review file (see `skill/REVIEW-BRIEF.md`) and runs `approve` | `final/` |
 | 8b | `relisten` | for passages nobody settled: a strong model hears 30 s of the original audio | `relisten.jsonl` |
-| 9 | `assemble` | Markdown and JSONL; refuses while a chunk is unreviewed | `<output>.md`, `<output>.jsonl` |
+| 9 | `assemble` | Markdown, one JSON document and JSONL; refuses while a chunk is unreviewed | `<output>.md`, `.json`, `.jsonl` |
 
 ## How a turn gets its name
 
