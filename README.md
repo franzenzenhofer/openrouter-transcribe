@@ -14,7 +14,8 @@ reviewed, speaker-named transcript**: one Markdown file to read and one JSONL fi
   is flagged.
 * **In batches, resumable, cheap.** Chunks run in parallel. Every result is written atomically,
   so any stage can be killed and rerun, and it only redoes what is missing. Every API call is in
-  a cost ledger. 9 hours of German workshop audio cost about 11 USD.
+  a cost ledger. 8.4 hours of workshop audio cost 12.05 USD in total, half of it the second
+  listener.
 
 All models run through [OpenRouter](https://openrouter.ai). The voice fingerprints run locally
 ([sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)); no account, no gated models, no audio
