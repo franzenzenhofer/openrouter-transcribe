@@ -1,5 +1,6 @@
 """Cut planning, coverage and the project file."""
 
+import dataclasses
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -42,7 +43,7 @@ def test_chunks_cover_the_source_and_map_to_clock_time() -> None:
 
 def test_a_gap_between_chunks_is_refused() -> None:
     chunks = build_chunks(SOURCE, [1800.0], 3600.0, first=1)
-    broken = [chunks[0], type(chunks[1])(**{**chunks[1].to_json(), "start": 1801.0})]
+    broken = [chunks[0], dataclasses.replace(chunks[1], start=1801.0)]
     with pytest.raises(ValueError, match="gap or overlap"):
         assert_full_coverage(broken, {"a": 3600.0})
 

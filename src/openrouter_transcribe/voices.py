@@ -25,7 +25,7 @@ from openrouter_transcribe.store import (
     voices_dir,
     write_json,
 )
-from openrouter_transcribe.voice_report import write_report
+from openrouter_transcribe.voice_report import append_consistency, write_report
 
 
 def cache_path(project: Project, chunk: Chunk) -> Path:
@@ -123,5 +123,9 @@ def run(project: Project) -> None:
                           read_json(stage_path(project, "listen", chunk))["turns"]]
              for chunk in chunks}
     write_report(project, centroids, assignments, texts)
+    append_consistency(project, [(row, text, turn.vector) for chunk in chunks
+                                 for row, text, turn in zip(assignments[chunk.name],
+                                                            texts[chunk.name], turns[chunk.name],
+                                                            strict=True)])
     print(f"voices: {len(centroids)} people enrolled; report at "
           f"{voices_dir(project) / 'report.md'}", flush=True)

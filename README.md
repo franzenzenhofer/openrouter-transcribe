@@ -110,7 +110,7 @@ separate and every disagreement.
 ## Development
 
 ```bash
-uv run ruff check . && uv run mypy src && uv run pytest -q
+uv run ruff check . && uv run mypy src tests && uv run pytest -q
 ```
 
 ## License

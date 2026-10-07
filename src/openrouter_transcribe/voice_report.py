@@ -4,6 +4,7 @@ from collections import Counter
 from typing import Any
 
 from openrouter_transcribe.config import Project
+from openrouter_transcribe.consistency import check
 from openrouter_transcribe.speakers import Vector
 from openrouter_transcribe.store import voices_dir
 
@@ -79,3 +80,35 @@ def write_report(project: Project, centroids: dict[str, Vector],
         "## Disagreements and flags", "", *disagreements(assignments, texts), "",
     ]
     (voices_dir(project) / "report.md").write_text("\n".join(lines))
+
+
+CONSISTENCY_MIN_SECONDS = 4.0
+CONSISTENCY_MIN_WORDS = 12
+
+
+def consistency_lines(title: str, samples: list[tuple[str, Vector]]) -> list[str]:
+    result = check([vector for _, vector in samples], [name for name, _ in samples])
+    lines = [f"### {title}", "", f"{len(samples)} turns, agreement {result.agreement:.1%}", ""]
+    lines += [f"- cluster {index + 1}: " + ", ".join(f"{name} {count}" for name, count in
+                                                    sorted(cluster.items(), key=lambda x: -x[1]))
+              for index, cluster in enumerate(result.clusters)]
+    return [*lines, ""]
+
+
+def append_consistency(project: Project, turns: list[tuple[dict[str, Any], str, Vector]]) -> None:
+    """Clusters the long turns (row, text, vector) without names, with and without the main
+    speaker, and appends how far the clusters coincide with the final names."""
+    people = set(project.names)
+    long_turns = [(row["speaker"], vector) for row, text, vector in turns
+                  if row["speaker"] in people
+                  and row["end_seconds"] - row["start_seconds"] >= CONSISTENCY_MIN_SECONDS
+                  and len(text.split()) >= CONSISTENCY_MIN_WORDS]
+    main = Counter(name for name, _ in long_turns).most_common(1)[0][0] if long_turns else ""
+    lines = ["## Independent check: clusters without names", "",
+             "Long turns clustered by voice alone (k = number of people). Agreement = share of "
+             "turns whose cluster majority is their own name. Below 90% means people are mixed up.",
+             "", *consistency_lines("Everyone", long_turns),
+             *consistency_lines(f"Everyone except {main}",
+                                [item for item in long_turns if item[0] != main])]
+    with (voices_dir(project) / "report.md").open("a") as report:
+        report.write("\n".join(lines))

@@ -18,6 +18,7 @@ MODEL_URL = ("https://github.com/k2-fsa/sherpa-onnx/releases/download/"
 MODEL_DIR = Path.home() / ".cache" / "openrouter-transcribe" / "models"
 RATE = 16000
 MIN_SECONDS = 1.0
+MAX_SECONDS = 20.0
 THREADS_PER_MODEL = 4
 
 Samples = NDArray[np.float32]
@@ -65,11 +66,24 @@ class Embedder:
         stream.input_finished()
         return unit(np.asarray(extractor.compute(stream), dtype=np.float32))  # type: ignore[attr-defined]
 
-    def embed(self, samples: Samples) -> Vector:
+    def _parts(self, samples: Samples) -> list[Vector]:
+        """One unit vector per model for one piece of audio."""
         audio = padded(samples)
-        parts = list(self.pool.map(lambda extractor: self._one(extractor, audio),
-                                   self.extractors))
-        return (np.concatenate(parts) / math.sqrt(len(parts))).astype(np.float32)
+        return list(self.pool.map(lambda extractor: self._one(extractor, audio),
+                                  self.extractors))
+
+    def embed(self, samples: Samples) -> Vector:
+        """Per model, long audio is embedded in MAX_SECONDS pieces and averaged (the models
+        cap the input length); the per-model unit vectors are joined so that a dot product
+        of two embeddings is the mean cosine over the models."""
+        size = int(MAX_SECONDS * RATE)
+        pieces = [samples[begin:begin + size] for begin in range(0, max(1, samples.size), size)]
+        if len(pieces) > 1 and pieces[-1].size < MIN_SECONDS * RATE:
+            pieces = pieces[:-1]
+        per_piece = [self._parts(piece) for piece in pieces]
+        per_model = [unit(np.mean(np.stack(column), axis=0).astype(np.float32))
+                     for column in zip(*per_piece, strict=True)]
+        return (np.concatenate(per_model) / math.sqrt(len(per_model))).astype(np.float32)
 
 
 def windows(samples: Samples, voices: Voices) -> list[tuple[float, Samples]]:
