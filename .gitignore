@@ -1,0 +1,10 @@
+__pycache__/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+work/
+*.mp3
+*.flac
+*.wav
+*.onnx

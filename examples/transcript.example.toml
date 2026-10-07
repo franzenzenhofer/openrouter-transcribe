@@ -1,0 +1,55 @@
+# Example project file. Copy it next to your recordings as transcript.toml and edit.
+# All people, places and numbers here are made up.
+
+title = "Product Workshop - Transcript, 2026-03-12"
+language = "en"                      # ISO 639-1, passed to the speech-to-text models
+output = "product-workshop-transcript-2026-03-12"   # -> <output>.md and <output>.jsonl
+chunk_seconds = 480                  # chunks are cut at the quietest moment near each target
+workers = 6                          # parallel API calls
+
+# What the listening model needs to know: occasion, language, who is where in the room.
+setting = """
+A one-day product workshop in a meeting room. Language English. The facilitator Ana sits next
+to the laptop microphone and speaks most of the time; three participants sit around the table.
+"""
+
+# Names and terms the models must spell right.
+glossary = ["roadmap", "OKR", "Kubernetes", "PostgreSQL"]
+
+# [models] is optional; these are the defaults.
+[models]
+whisper = "openai/whisper-large-v3"
+stt = "deepgram/nova-3"              # gives word timing, used to pin turn starts
+listener = "google/gemini-3.8-flash"
+second = "google/gemini-3.1-pro-preview"
+auditor = "google/gemini-3.8-flash"
+
+# [voices] is optional; these are the defaults.
+[voices]
+models = ["nemo_en_titanet_large.onnx", "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx"]
+min_similarity = 0.45
+min_margin = 0.08
+
+# Recordings. `sha256` is checked before anything else happens; the files are only read.
+# Wall-clock times map audio seconds to clock times in the transcript.
+[[sources]]
+key = "am"
+title = "Morning"
+file = "recordings/morning.flac"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+wall_start = "2026-03-12T09:00:00+01:00"
+wall_end = "2026-03-12T12:30:00+01:00"
+note = "Lossless recording."
+
+# People. Samples are stretches where only that person speaks (seconds into the source,
+# "MM:SS" or "H:MM:SS"), ideally their own introduction. 10-30 s each is enough; more is better.
+# A person without samples is enrolled from turns where the listening model is sure of them.
+[[people]]
+name = "Ana"
+description = "Facilitator. Female, loud, closest to the microphone, the main speaker."
+samples = [{ source = "am", start = "01:05", end = "01:35" }]
+
+[[people]]
+name = "Ben"
+description = "Backend engineer. Male, quiet, sits furthest from the microphone."
+samples = [{ source = "am", start = "04:10", end = "04:25" }]
