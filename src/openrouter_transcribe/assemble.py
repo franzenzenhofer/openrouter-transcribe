@@ -5,10 +5,11 @@ Refuses while any chunk is unreviewed or a turn carries a label outside the rost
 
 import json
 import re
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
-from openrouter_transcribe.config import Project, parse_clock
+from openrouter_transcribe.config import Person, Project, parse_clock
 from openrouter_transcribe.plan import Chunk, turn_ends
 from openrouter_transcribe.review import STATUS_REVIEWED
 from openrouter_transcribe.store import load_chunks, read_json, stage_path
@@ -101,12 +102,23 @@ def method_section(project: Project, chunks: list[Chunk]) -> list[str]:
         f"each chunk with both drafts and wrote the turns; `{models['second']}` listened "
         "independently as a cross-check.",
         "- Speaker names: local voice fingerprints (sherpa-onnx, "
-        f"{', '.join(project.voices.models)}) enrolled from each person's own introduction, "
+        f"{', '.join(project.voices.models)}) {enrolment_note(project.people)}, "
         "checked against who the listening model heard; disagreements were reviewed.",
         f"- `{models['auditor']}` heard every chunk again against the transcript and listed "
         "omissions, misheard words and wrong speakers; a reviewer applied them chunk by chunk.",
         f"- `{project.unintelligible}` marks speech that could not be understood.", "",
     ]
+
+
+def enrolment_note(people: Sequence[Person]) -> str:
+    """How the voices were enrolled, as it really happened: a recording that starts after the
+    introduction round has samples for some people only."""
+    sampled = [person.name for person in people if person.samples]
+    if len(sampled) == len(people):
+        return "enrolled from each person's own voice samples"
+    return (f"enrolled from voice samples of {', '.join(sampled) or 'nobody'}; the other "
+            f"{len(people) - len(sampled)} people had no sample and are named only where the "
+            "voice evidence and the listener agree")
 
 
 def run(project: Project) -> None:
