@@ -79,7 +79,7 @@ Long turns are also scanned window by window; a stretch that clearly sounds like
 is flagged as a possible speaker change. `work/voices/report.md` shows how well the voices
 separate and every disagreement.
 
-## Lessons learned (two full-day workshops, 17 hours)
+## Lessons learned (three full-day workshops, 24 hours)
 
 1. **Record lossless, in segments, supervised.** An ffmpeg recording dropped 12% of its samples
    in tiny fragments; that audio is gone. `record/record-loop.sh` runs sox in 30-minute FLAC
@@ -109,6 +109,14 @@ separate and every disagreement.
     HTTP errors only (5xx incl. 520-524, 429), a cost ledger per call.
 12. **A capped API key per project.** Long audio runs are cheap but not free; a per-project key
     with a hard limit makes a runaway loop harmless.
+13. **An empty draft is a result, not an error.** On quiet stretches (people working on their own,
+    the speaker away from the microphone) one speech-to-text model often returns no text while
+    the other hears words (2026-10-14: Deepgram empty on 2 of 51 chunks, Whisper 818 words). The
+    draft is stored empty and the listener decides from the audio; only a malformed answer fails.
+14. **No intro round on the recording? Ask the listener for samples.** When recording starts
+    after the introductions, send the first minutes to the listening model and ask for stretches
+    where only the main speaker talks; participants are then enrolled from turns where they are
+    named.
 
 ## Development
 
