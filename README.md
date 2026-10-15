@@ -121,7 +121,10 @@ separate and every disagreement.
     lunch break has chunks of empty room (2026-10-15, chunk 013: -60 dB mean against -32 dB for
     talk; Deepgram empty, Whisper "Vielen Dank. Amen."). The listener answered no turns and the
     run failed. The rules now ask for one explicit `[no speech]` turn with a note, so the
-    silence is a reviewed result in the transcript instead of a hole or a crash.
+    silence is a reviewed result in the transcript instead of a hole or a crash. An escape hatch
+    gets used: the second listener then answered `[no speech]` ("There is no audio") on three
+    chunks full of talk. So `[no speech]` is accepted only as the single turn of a chunk whose
+    word-timed draft heard at most 20 words; anything else is asked again.
 
 ## Development
 
