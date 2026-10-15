@@ -31,7 +31,12 @@ Rules:
    round or correct them.
 7. Use "notes" for anything a reviewer must know: unsure passages, crosstalk, audio problems.
    Leave it empty when there is nothing.
+8. Never return an empty list of turns. If AUDIO holds no audible speech at all (an empty room,
+   a break), return exactly one turn at 00:00 with speaker "{unclear}", basis "guess" and text
+   "{no_speech}", and say in "notes" what you hear instead.
 """
+
+NO_SPEECH = "[no speech]"
 
 TURN_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -59,7 +64,7 @@ def roster_text(project: Project) -> str:
 
 def system_prompt(project: Project) -> str:
     rules = LISTEN_RULES.format(unclear=project.unclear, several=project.several,
-                                unintelligible=project.unintelligible)
+                                unintelligible=project.unintelligible, no_speech=NO_SPEECH)
     return (f"You produce the authoritative verbatim transcript of one section of a long "
             f"recording.\n\nSetting:\n{project.setting}\n\nRoster (the people who speak):\n"
             f"{roster_text(project)}\n\nGlossary: {', '.join(project.glossary)}\n\n{rules}")
