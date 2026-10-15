@@ -11,7 +11,7 @@ from typing import Any
 from openrouter_transcribe.config import Project, parse_clock
 from openrouter_transcribe.openrouter import audio_part, chat_json
 from openrouter_transcribe.plan import Chunk, format_clock
-from openrouter_transcribe.prompt import LISTEN_SCHEMA, system_prompt, timed_draft
+from openrouter_transcribe.prompt import LISTEN_SCHEMA, NO_SPEECH, system_prompt, timed_draft
 from openrouter_transcribe.runner import run_all
 from openrouter_transcribe.store import (
     chunk_audio,
@@ -26,6 +26,10 @@ from openrouter_transcribe.store import (
 MAX_OUTPUT_TOKENS = 40000
 ATTEMPTS = 3
 TIMESTAMP_SLACK_SECONDS = 10.0
+# A "[no speech]" answer is believed only when the word-timed draft heard at most this many words.
+# 2026-10-15: the second listener answered "[no speech]" ("There is no audio") on chunks where
+# Deepgram heard 112-1186 words; the lunch-break chunk it was made for had 0.
+NO_SPEECH_MAX_DRAFT_WORDS = 20
 
 
 def task_text(project: Project, chunk: Chunk) -> str:
@@ -66,6 +70,22 @@ def validate(project: Project, result: dict[str, Any], chunk: Chunk) -> None:
         raise ValueError(f"speaker labels outside the roster: {sorted(unknown)}")
     if any(not turn["text"].strip() for turn in turns):
         raise ValueError("turn with empty text")
+    check_no_speech(turns, draft_words(project, chunk))
+
+
+def draft_words(project: Project, chunk: Chunk) -> int:
+    return len(str(read_json(raw_path(project, chunk, project.models["stt"]))["text"]).split())
+
+
+def check_no_speech(turns: list[dict[str, str]], heard_words: int) -> None:
+    """Silence is one "[no speech]" turn, and only where the draft heard (almost) nothing."""
+    silent = [turn for turn in turns if turn["text"].strip() == NO_SPEECH]
+    if not silent:
+        return
+    if len(turns) > 1:
+        raise ValueError(f"{NO_SPEECH} next to other turns")
+    if heard_words > NO_SPEECH_MAX_DRAFT_WORDS:
+        raise ValueError(f"{NO_SPEECH} although the draft heard {heard_words} words")
 
 
 def request(project: Project, chunk: Chunk, model: str) -> dict[str, Any]:
