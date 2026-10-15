@@ -117,6 +117,11 @@ separate and every disagreement.
     after the introductions, send the first minutes to the listening model and ask for stretches
     where only the main speaker talks; participants are then enrolled from turns where they are
     named.
+15. **A section without speech must still be written down.** A recording that runs through the
+    lunch break has chunks of empty room (2026-10-15, chunk 013: -60 dB mean against -32 dB for
+    talk; Deepgram empty, Whisper "Vielen Dank. Amen."). The listener answered no turns and the
+    run failed. The rules now ask for one explicit `[no speech]` turn with a note, so the
+    silence is a reviewed result in the transcript instead of a hole or a crash.
 
 ## Development
 
