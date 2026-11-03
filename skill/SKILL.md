@@ -1,6 +1,6 @@
 ---
 name: openrouter-transcribe
-description: Use when a long recording (workshop, meeting, interview day, podcast, lecture) must become a complete, reviewed transcript with the right speaker names - "transcribe the recording", "transcript of the workshop", "who said what", "assign speaker names", "Transkript", "Mitschrift aus der Aufnahme" - via OpenRouter, in resumable batches, so that nothing gets lost. Also for recording a session losslessly beforehand.
+description: Use when a long recording (workshop, meeting, interview day, podcast, lecture) must become a complete, reviewed transcript with the right speaker names - "transcribe the recording", "transcript of the workshop", "who said what", "assign speaker names", "Transkript", "Mitschrift aus der Aufnahme" - via OpenRouter, in resumable batches, so that nothing gets lost. Also for recording a session losslessly beforehand. Also for recording a LIVE CALL on this Mac (Teams, Zoom, Meet) incl. with AirPods and transcribing it cheaply - "record this call", "start recording", "record audio and my screen", "AirPods", "Teams call recording", "Call aufnehmen", "Aufnahme starten".
 ---
 
 # openrouter-transcribe
@@ -17,6 +17,45 @@ OT="uv run --project ~/dev/openrouter-transcribe openrouter-transcribe -c transc
 Copy `~/dev/openrouter-transcribe/record/` into the project's `recordings/` and use
 `start-recording.sh` / `status.sh` / `stop-recording.sh` / `finish-recording.sh`. Lossless,
 30-minute segments, supervised. Copy the files off the machine the same day.
+
+## Live call on this Mac (Teams/Zoom/Meet), also with AirPods - cheap path
+
+Why: with AirPods the remote voices never reach any microphone, and ffmpeg/avfoundation cannot capture
+system output. `scripts/sysaudio.swift` (ScreenCaptureKit) captures system audio with no driver
+(no BlackHole). Mics + screen go through ffmpeg. Both start from ONE script (lesson: starting them
+separately lost the first minute of the remote side). Scripts live in `~/.claude/skills/openrouter-transcribe/scripts/`
+(`S=~/.claude/skills/openrouter-transcribe/scripts`).
+
+Runbook:
+1. Once per terminal app: Screen Recording permission (System Settings > Privacy & Security), needed
+   by ffmpeg screen capture AND ScreenCaptureKit. Without it both exit at start and the script says so.
+2. Start (before the call, or the moment it begins):
+   `bash $S/record-start.sh --out <dir> --title <name>` (`--no-video` for audio only; `--mic1 REGEX`,
+   `--mic2 REGEX`, `--screen REGEX` override the default device-name matches AirPods / MacBook.*Microphone /
+   Capture screen). Devices are found by NAME from `ffmpeg -f avfoundation -list_devices true -i ""`, never by
+   index (the AirPods index changes). It compiles `sysaudio` on first use (`swiftc -O`), launches ffmpeg and
+   sysaudio together and writes `<dir>/record.state` (PIDs, start timestamps, offset).
+3. Stop: `bash $S/record-stop.sh --out <dir>`. SIGINT to both (files are finalised), waits, then prints duration +
+   volumedetect per track. Exit 3 and "FAILED" if a file is missing or a track has mean below -60 dB. Do not
+   transcribe a failed recording; if it fails during the call, fix it then (AirPods connected? Mac output
+   really set to them? permission?).
+4. Mix: `bash $S/mix.sh --main <main.mkv> --sys <sysaudio.m4a> --out <dir>/mix --offset-ms <sysaudio_start_ms - ffmpeg_start_ms>`
+   (both values are in the `record.state.stopped-*` file; the start script also prints the offset).
+   Result: STEREO 16 kHz, left = me (mic track 1), right = remote (system audio), mp3 chunks of 18 min at
+   32 kbps (about 4.3 MB each). `--with-mic2` adds the built-in mic to the left channel only if track 1 is weak.
+5. Transcribe: `export OPENROUTER_API_KEY=...` (never hardcoded; the script exits with a clear error if missing), then
+   `python3 -I $S/transcribe.py --chunks-dir <dir>/mix --out <dir>/transcript.md --title "..." --language German --participants "Franz Enzenhofer (left channel); Name (right channel)"`.
+   One google/gemini-2.5-flash call per chunk, prompt asks for verbatim `[mm:ss] Name: text` lines and tells Gemini
+   which channel is who. Measured: 17 min = 4.2 MB = 0.046 USD.
+
+Lessons:
+* Mono-mixing mic + system audio echoes duplicate lines (the remote voice is on both when speakers are used),
+  so keep them as separate channels for speaker attribution.
+* Keep each upload under 5 MB (metered-connection guard allows local uploads under 5 MB); longer calls become
+  several chunks (mix.sh and transcribe.py both enforce it).
+* Timestamps in a chunk's transcript are relative to that clip; the header gives the clip start.
+* Do not run this on a metered connection if the upload would exceed the guard; chunks stay below it.
+* Test of the scripts: 8 s run, files finalised, ffprobe readable; silence is detected and reported by record-stop.sh.
 
 ## 1. Project file
 
