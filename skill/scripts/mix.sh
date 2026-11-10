@@ -23,12 +23,12 @@ mkdir -p "$OUT"
 # offset > 0: system audio started later => delay it. offset < 0: delay the mics instead.
 SYS_DELAY=0; MIC_DELAY=0
 if [ "$OFFSET" -ge 0 ]; then SYS_DELAY="$OFFSET"; else MIC_DELAY=$((-OFFSET)); fi
-LEFT="[0:a:0]aresample=16000,pan=mono|c0=c0,adelay=${MIC_DELAY}[l]"
+LEFT="[0:a:0]aresample=16000:async=1:first_pts=0,pan=mono|c0=c0,adelay=${MIC_DELAY}[l]"
 LMAP="[l]"
 if [ "$MIC2" = 1 ]; then
-  LEFT="[0:a:0]aresample=16000,pan=mono|c0=c0,adelay=${MIC_DELAY}[l1];[0:a:1]aresample=16000,pan=mono|c0=c0,adelay=${MIC_DELAY}[l2];[l1][l2]amix=inputs=2:normalize=0[l]"
+  LEFT="[0:a:0]aresample=16000:async=1:first_pts=0,pan=mono|c0=c0,adelay=${MIC_DELAY}[l1];[0:a:1]aresample=16000:async=1:first_pts=0,pan=mono|c0=c0,adelay=${MIC_DELAY}[l2];[l1][l2]amix=inputs=2:normalize=0[l]"
 fi
-RIGHT="[1:a:0]aresample=16000,pan=mono|c0=0.5*c0+0.5*c1,adelay=${SYS_DELAY}[r]"
+RIGHT="[1:a:0]aresample=16000:async=1:first_pts=0,pan=mono|c0=0.5*c0+0.5*c1,adelay=${SYS_DELAY}[r]"
 FULL="$OUT/mix-stereo-16k.wav"
 ffmpeg -hide_banner -loglevel error -y -i "$MAIN" -i "$SYS" -filter_complex \
   "$LEFT;$RIGHT;${LMAP}[r]join=inputs=2:channel_layout=stereo,dynaudnorm[m]" -map "[m]" -ar 16000 "$FULL"
