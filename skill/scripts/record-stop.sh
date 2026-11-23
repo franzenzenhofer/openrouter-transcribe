@@ -14,12 +14,22 @@ STATE="$OUT/record.state"
 FF_PID="$(state_get "$STATE" ffmpeg_pid)"; SYS_PID="$(state_get "$STATE" sysaudio_pid)"
 MAIN="$(state_get "$STATE" main_file)"; SYS="$(state_get "$STATE" sys_file)"
 
+FAIL=0
+NOW_ISO="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+SYSLOG="$(state_get "$STATE" sysaudio_log)"; [ -n "$SYSLOG" ] || SYSLOG="$OUT/sysaudio.log"
+echo "--- interruptions (recording started $(state_get "$STATE" start_iso), stopped $NOW_ISO) ---"
+if ! kill -0 "$FF_PID" 2>/dev/null; then echo "FAIL  ffmpeg (pid $FF_PID) died before stop - main file ends early (checked $NOW_ISO; see $OUT/ffmpeg.log)"; FAIL=1; fi
+if ! kill -0 "$SYS_PID" 2>/dev/null; then echo "FAIL  sysaudio (pid $SYS_PID) died before stop - system audio ends early (checked $NOW_ISO; see $SYSLOG)"; FAIL=1; fi
+if [ -f "$SYSLOG" ] && grep -qE 'SLEEP|WAKE|stopped with error' "$SYSLOG"; then
+  grep -E 'SLEEP|WAKE|stopped with error' "$SYSLOG" | sed 's/^/FAIL  Mac slept or capture broke: /'
+  FAIL=1
+fi
+[ "$FAIL" = 0 ] && echo "ok    no sleep, wake or early death seen"
 kill -INT "$FF_PID" "$SYS_PID" 2>/dev/null
 for _ in $(seq 1 100); do
   kill -0 "$FF_PID" 2>/dev/null || kill -0 "$SYS_PID" 2>/dev/null || break
   sleep 0.3
 done
-FAIL=0
 for p in "$FF_PID" "$SYS_PID"; do
   if kill -0 "$p" 2>/dev/null; then echo "FAIL: pid $p still running after 30 s (file may be unfinalised)"; FAIL=1; fi
 done

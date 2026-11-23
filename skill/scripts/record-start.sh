@@ -60,9 +60,14 @@ fi
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 SAFE="$(printf '%s' "$TITLE" | tr -c 'A-Za-z0-9._-' '-')"
 MAIN="$OUT/$SAFE-$STAMP.$EXT"
-SYS="$OUT/$SAFE-sysaudio-$STAMP.m4a"
+SYS="$OUT/$SAFE-sysaudio-$STAMP.mp4"
 SYSLOG="$OUT/sysaudio.log"; FFLOG="$OUT/ffmpeg.log"
 : > "$SYSLOG"
+
+# a closed lid or idle sleep ends the capture (2026-11-23): keep the Mac awake while recording
+if pmset -g batt 2>/dev/null | grep -q "'Battery Power'"; then
+  echo "WARNING: on BATTERY - plug in power now, a flat battery or lid-close sleep ends the recording" >&2
+fi
 
 # launch both back to back; sysaudio needs about a second to report "recording"
 "$BIN" "$SYS" > "$SYSLOG" 2>&1 &
@@ -71,10 +76,16 @@ T_SYS_LAUNCH="$(now_ms)"
 ffmpeg -hide_banner -loglevel warning -nostdin "${INPUTS[@]}" "${MAPS[@]}" "${CODEC[@]}" "$MAIN" > "$FFLOG" 2>&1 &
 FF_PID=$!
 T_FF_LAUNCH="$(now_ms)"
+# caffeinate -dims: no display/idle/disk/system sleep while the ffmpeg recorder lives; its own watcher
+# for sysaudio too (-w takes one pid, so one caffeinate each; the first PID goes to the state file)
+caffeinate -dims -w "$FF_PID" >/dev/null 2>&1 &
+CAF_PID=$!
+caffeinate -dims -w "$SYS_PID" >/dev/null 2>&1 &
+CAF2_PID=$!
 
 for _ in $(seq 1 50); do
   grep -q 'recording' "$SYSLOG" && break
-  kill -0 "$SYS_PID" 2>/dev/null || { cat "$SYSLOG" >&2; kill -INT "$FF_PID" 2>/dev/null || true; die "sysaudio exited at start (Screen Recording permission for this terminal?)"; }
+  kill -0 "$SYS_PID" 2>/dev/null || { cat "$SYSLOG" >&2; kill -INT "$FF_PID" 2>/dev/null || true; die "sysaudio exited at start (Screen Recording permission for this terminal, or the display is asleep: run caffeinate -u -t 3)"; }
   sleep 0.2
 done
 grep -q 'recording' "$SYSLOG" || { kill -INT "$SYS_PID" "$FF_PID" 2>/dev/null || true; die "sysaudio did not start within 10 s"; }
@@ -88,6 +99,10 @@ main_file=$MAIN
 sys_file=$SYS
 ffmpeg_pid=$FF_PID
 sysaudio_pid=$SYS_PID
+caffeinate_pid=$CAF_PID
+caffeinate2_pid=$CAF2_PID
+start_iso=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+sysaudio_log=$SYSLOG
 ffmpeg_start_ms=$T_FF_LAUNCH
 sysaudio_start_ms=$T_SYS_READY
 sysaudio_launch_ms=$T_SYS_LAUNCH

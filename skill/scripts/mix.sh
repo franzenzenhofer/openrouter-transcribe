@@ -2,7 +2,7 @@
 # Build the transcription input: STEREO, left = me (mic track 1), right = remote (system audio), 16 kHz,
 # aligned by the start offset between the two recorders, cut into mp3 chunks that stay under 5 MB
 # (32 kbps => 1080 s chunk = about 4.3 MB).
-# Usage: mix.sh --main FILE.mkv --sys FILE.m4a --out DIR --offset-ms N [--with-mic2] [--chunk-sec 1080]
+# Usage: mix.sh --main FILE.mkv --sys FILE.mp4 --out DIR --offset-ms N [--with-mic2] [--chunk-sec 1080]
 #   --offset-ms  sysaudio_start_ms - ffmpeg_start_ms from record.state (positive = system audio started later)
 #   --with-mic2  also add mic track 2 to the left channel (only if track 1 is weak; may echo the remote voice)
 set -euo pipefail

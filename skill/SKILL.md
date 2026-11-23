@@ -39,7 +39,7 @@ Runbook:
    volumedetect per track. Exit 3 and "FAILED" if a file is missing or a track has mean below -60 dB. Do not
    transcribe a failed recording; if it fails during the call, fix it then (AirPods connected? Mac output
    really set to them? permission?).
-4. Mix: `bash $S/mix.sh --main <main.mkv> --sys <sysaudio.m4a> --out <dir>/mix --offset-ms <sysaudio_start_ms - ffmpeg_start_ms>`
+4. Mix: `bash $S/mix.sh --main <main.mkv> --sys <sysaudio.mp4> --out <dir>/mix --offset-ms <sysaudio_start_ms - ffmpeg_start_ms>`
    (both values are in the `record.state.stopped-*` file; the start script also prints the offset).
    Result: STEREO 16 kHz, left = me (mic track 1), right = remote (system audio), mp3 chunks of 18 min at
    32 kbps (about 4.3 MB each). `--with-mic2` adds the built-in mic to the left channel only if track 1 is weak.

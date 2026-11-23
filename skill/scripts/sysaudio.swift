@@ -1,18 +1,30 @@
-// Records macOS system audio (everything the Mac plays, e.g. the Teams call) to an .m4a via ScreenCaptureKit.
-// Usage: swift sysaudio.swift <out.m4a>   Stop with SIGINT (kill -INT pid); the file is finalised on stop.
+// Records macOS system audio (everything the Mac plays, e.g. the Teams call) to an .mp4 via ScreenCaptureKit.
+// Usage: swift sysaudio.swift <out.mp4>   Stop with SIGINT or SIGTERM; the file is finalised on stop.
+// The file is fragmented MP4 (a fragment every 1 s), so even after SIGKILL, a crash or a stream error
+// everything but the last few seconds is decodable (2026-11-23: a closed lid left an .m4a without its
+// moov index). Sleep and wake are logged as "SLEEP <time>" / "WAKE <time>".
+import AppKit
 import AVFoundation
 import Foundation
 import ScreenCaptureKit
+
+func log(_ message: String) {
+    FileHandle.standardError.write("[sysaudio] \(message)\n".data(using: .utf8)!)
+}
+
+func stamp() -> String { ISO8601DateFormatter().string(from: Date()) }
 
 final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     let writer: AVAssetWriter
     let input: AVAssetWriterInput
     var stream: SCStream?
     var started = false
+    var finalised = false
     let queue = DispatchQueue(label: "sysaudio")
 
     init(url: URL) throws {
-        writer = try AVAssetWriter(outputURL: url, fileType: .m4a)
+        writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
+        writer.movieFragmentInterval = CMTime(seconds: 1, preferredTimescale: 600)
         input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
             AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: 48000,
             AVNumberOfChannelsKey: 2, AVEncoderBitRateKey: 128_000,
@@ -23,7 +35,7 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
 
     func start() async throws {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = content.displays.first else { throw NSError(domain: "sysaudio", code: 1) }
+        guard let display = content.displays.first else { log("no display found (display asleep, or no Screen Recording permission)"); throw NSError(domain: "sysaudio", code: 1) }
         let filter = SCContentFilter(display: display, excludingWindows: [])
         let cfg = SCStreamConfiguration()
         cfg.capturesAudio = true
@@ -37,7 +49,7 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         try s.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
         try await s.startCapture()
         stream = s
-        FileHandle.standardError.write("[sysaudio] recording\n".data(using: .utf8)!)
+        log("recording")
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sb: CMSampleBuffer, of type: SCStreamOutputType) {
@@ -47,35 +59,49 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
             writer.startSession(atSourceTime: sb.presentationTimeStamp)
             started = true
         }
-        if input.isReadyForMoreMediaData { input.append(sb) }
+        if !finalised, input.isReadyForMoreMediaData { input.append(sb) }
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        FileHandle.standardError.write("[sysaudio] stopped with error: \(error)\n".data(using: .utf8)!)
-        exit(2)
+        log("stopped with error: \(error) at \(stamp())")
+        Task { await finalise(); exit(2) }
+    }
+
+    func finalise() async {
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            queue.async {
+                if self.finalised || !self.started { c.resume(); return }
+                self.finalised = true
+                self.input.markAsFinished()
+                self.writer.finishWriting { c.resume() }
+            }
+        }
+        log("finalised")
     }
 
     func stop() async {
         try? await stream?.stopCapture()
-        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
-            queue.async {
-                if self.started { self.input.markAsFinished(); self.writer.finishWriting { c.resume() } } else { c.resume() }
-            }
-        }
-        FileHandle.standardError.write("[sysaudio] finalised\n".data(using: .utf8)!)
+        await finalise()
     }
 }
 
 let out = URL(fileURLWithPath: CommandLine.arguments[1])
 let rec = try Recorder(url: out)
-signal(SIGINT, SIG_IGN)
-let sig = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
-sig.setEventHandler { Task { await rec.stop(); exit(0) } }
-sig.resume()
+var sources: [DispatchSourceSignal] = []
+for sigNo in [SIGINT, SIGTERM] {
+    signal(sigNo, SIG_IGN)
+    let src = DispatchSource.makeSignalSource(signal: sigNo, queue: .main)
+    src.setEventHandler { Task { await rec.stop(); exit(0) } }
+    src.resume()
+    sources.append(src)
+}
+let center = NSWorkspace.shared.notificationCenter
+center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { _ in log("SLEEP \(stamp())") }
+center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in log("WAKE \(stamp())") }
 Task {
     do { try await rec.start() } catch {
-        FileHandle.standardError.write("[sysaudio] start failed: \(error)\n".data(using: .utf8)!)
+        log("start failed: \(error)")
         exit(1)
     }
 }
-dispatchMain()
+RunLoop.main.run()

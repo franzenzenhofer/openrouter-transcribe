@@ -84,6 +84,11 @@ separate and every disagreement.
 1. **Record lossless, in segments, supervised.** An ffmpeg recording dropped 12% of its samples
    in tiny fragments; that audio is gone. `record/record-loop.sh` runs sox in 30-minute FLAC
    segments and restarts it if a segment stops growing.
+   Live-call recording (`skill/scripts/record-start.sh`): closing the lid ended the capture and left
+   an `.m4a` without its index (2026-11-23). Now: fragmented MP4 (a fragment per second, so a kill
+   or crash keeps all but the last second), `caffeinate -dims` around both recorders, SLEEP/WAKE
+   lines in `sysaudio.log`, and `record-stop.sh` fails loudly on any sleep or early death. Plug in
+   power. `sysaudio` finds no display (exit 1) while the screen is asleep: `caffeinate -u -t 3`.
 2. **Never touch the originals.** Make them read-only, keep a `SHA256SUMS`, copy them off the
    machine, and let the harness verify the checksum before every run.
 3. **Cut at silence, not at the clock.** Cutting mid-word loses that word in both chunks.
